@@ -1,52 +1,61 @@
-name: SBOM Pipeline
+name: Python Build and Artifact Workflow with SBOM
 
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+on: 
+  workflow_dispatch:
 
 jobs:
-  sbom:
+  build:
+
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Check out the repository
-    - name: Check out code
-      uses: actions/checkout@v3
+    # Step 1: Check out the repository
+    - uses: actions/checkout@v3
 
-    
+    # Step 2: Set up Python environment
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10' # Specify the Python version you need
 
+    # Step 3: Install dependencies
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 3. Install Microsoft's SBOM Tool
+    # Step 4: Build or package the project
+    - name: Build the project
+      run: |
+        python setup.py sdist bdist_wheel
+        mkdir buildOutput
+        mv dist/* buildOutput/
+
+    # Step 5: Download and set up SBOM Tool
     - name: Install SBOM Tool
       run: |
-        curl -LO https://github.com/microsoft/sbom-tool/releases/download/v1.2.3/sbom-tool-linux-x64
-        chmod +x sbom-tool-linux-x64
-        mv sbom-tool-linux-x64 /usr/local/bin/sbom-tool
+        curl -Lo $RUNNER_TEMP/sbom-tool https://github.com/microsoft/sbom-tool/releases/latest/download/sbom-tool-linux-x64
+        chmod +x $RUNNER_TEMP/sbom-tool
 
-    # 4. Generate SBOM
+    # Step 6: Generate SBOM
     - name: Generate SBOM
       run: |
-        sbom-tool generate -b . -bc . -pn "Lambda Uploader" -pv "1.0.0" -ps "Open Source Project"
+        $RUNNER_TEMP/sbom-tool generate \
+          -b ./buildOutput \
+          -bc . \
+          -pn "Python Project" \
+          -pv "1.0.0" \
+          -ps "MyCompany" \
+          -nsb "https://sbom.mycompany.com" \
+          -V Verbose
+      env:
+        DOTNET_NOLOGO: true
 
-    # 5. Validate SBOM
-    - name: Validate SBOM
-      run: |
-        sbom-tool validate -i _manifest/spdx_2.2
-
-    # 6. Upload SBOM as an artifact
-    - name: Upload SBOM artifact
-      uses: actions/upload-artifact@v3
+    # Step 7: Upload Build and SBOM Artifacts
+    - name: Upload Build and SBOM Artifacts
+      uses: actions/upload-artifact@v3.1.0
       with:
-        name: sbom
-        path: _manifest/spdx_2.2
+        name: python-build-and-sbom
+        path: |
+          buildOutput
+          _manifest
