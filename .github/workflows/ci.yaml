@@ -54,7 +54,23 @@ jobs:
       env:
         DOTNET_NOLOGO: true
 
-    # Step 7: Upload Build and SBOM Artifacts
+      # Step 7: Set up Node.js for CDXGen
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    # Step 8: Install CDXGen
+    - name: Install CDXGen
+      run: npm install -g @cyclonedx/cdxgen
+
+    # Step 9: Generate SBOM with CDXGen
+    - name: Generate SBOM (CDXGen)
+      run: |
+        mkdir -p sbom
+        cdxgen -o sbom/sbom-cdxgen.json
+
+    # Step 10: Upload Build and SBOM Artifacts
     - name: Upload Build and SBOM Artifacts
       uses: actions/upload-artifact@v3.1.0
       with:
@@ -62,3 +78,4 @@ jobs:
         path: |
           buildOutput
           _manifest
+          sbom
